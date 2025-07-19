@@ -6,8 +6,7 @@
  * @author Jason Levitt
  */
 import "./initenv.js";
-import { RetailTrader, Transaction } from "./sdk/retail-trader.js";
-import { AxiosResponse } from "axios";
+import { HttpResponse, RetailTrader, Transaction } from "./sdk/retail-trader.js";
 interface Credentials {
     appKey: string;
     appSecret: string;
@@ -83,7 +82,7 @@ declare class TradingApiClient extends SchwabAPIclient {
     orderById(accountHash: string, orderId: string): Promise<any>;
     orderAll(fromEnteredTime: string, toEnteredTime: string, status?: string | null, maxResults?: number | null): Promise<any>;
     placeOrderByAcct(accountHash: string, orderObj: OrderObject): Promise<any>;
-    orderDelete(accountHash: string, orderId: number): Promise<AxiosResponse<void>>;
+    orderDelete(accountHash: string, orderId: number): Promise<HttpResponse<void>>;
     updateOrderById(accountHash: string, orderId: number, orderObj: OrderObject): Promise<any>;
     orderPreview(accountHash: string, orderObj: OrderObject): Promise<any>;
     accountsNumbers(): Promise<any>;

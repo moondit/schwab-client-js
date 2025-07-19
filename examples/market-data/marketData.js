@@ -30,6 +30,7 @@ console.log("\n\n");
 
 const fromDate = getFormattedDate(1); // Tommorrow
 const toDate = getFormattedDate(7); // A week later
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 let options = {
   contractType: "CALL",
   strategy: "SINGLE",

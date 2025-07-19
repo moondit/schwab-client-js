@@ -1,6 +1,7 @@
 // This file exists merely to show an example of calculating
 // each indicator.
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import StockList from "./stocklist.js";
 import calculateOBV from "./obv.js";
 import calculateCCI from "./cci.js";

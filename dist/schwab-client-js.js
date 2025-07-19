@@ -13,7 +13,6 @@ import endpoint from "./endpoints.js";
 import fetchData from "./fetch.js";
 import fetchToken from "./access.js";
 import { RetailTrader } from "./sdk/retail-trader.js";
-import { onRequest, onRequestError, onResponse, onResponseError } from "./sdk/interceptors.js";
 // Create WeakMap for private credential storage
 const _credentials = new WeakMap();
 /**
@@ -82,8 +81,6 @@ class TradingApiClient extends SchwabAPIclient {
     constructor() {
         super();
         this.retailTrader = new RetailTrader();
-        this.retailTrader.instance.interceptors.request.use(onRequest, onRequestError);
-        this.retailTrader.instance.interceptors.response.use(onResponse, onResponseError);
     }
     async ordersByAccount(accountHash, fromEnteredTime, toEnteredTime, status = null, maxResults = null) {
         await this.checkAccessToken(_credentials.get(this));

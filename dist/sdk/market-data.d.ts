@@ -2160,9 +2160,9 @@ export interface Expiration {
     settlementType?: SettlementType;
     optionRoots?: string;
 }
-import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, ResponseType } from "axios";
 export type QueryParamsType = Record<string | number, any>;
-export interface FullRequestParams extends Omit<AxiosRequestConfig, "data" | "params" | "url" | "responseType"> {
+export type ResponseFormat = keyof Omit<Body, "body" | "bodyUsed">;
+export interface FullRequestParams extends Omit<RequestInit, "body"> {
     /** set parameter to `true` for call `securityWorker` for this request */
     secure?: boolean;
     /** request path */
@@ -2172,16 +2172,26 @@ export interface FullRequestParams extends Omit<AxiosRequestConfig, "data" | "pa
     /** query params */
     query?: QueryParamsType;
     /** format of response (i.e. response.json() -> format: "json") */
-    format?: ResponseType;
+    format?: ResponseFormat;
     /** request body */
     body?: unknown;
+    /** base url */
+    baseUrl?: string;
+    /** request cancellation token */
+    cancelToken?: CancelToken;
 }
 export type RequestParams = Omit<FullRequestParams, "body" | "method" | "query" | "path">;
-export interface ApiConfig<SecurityDataType = unknown> extends Omit<AxiosRequestConfig, "data" | "cancelToken"> {
-    securityWorker?: (securityData: SecurityDataType | null) => Promise<AxiosRequestConfig | void> | AxiosRequestConfig | void;
-    secure?: boolean;
-    format?: ResponseType;
+export interface ApiConfig<SecurityDataType = unknown> {
+    baseUrl?: string;
+    baseApiParams?: Omit<RequestParams, "baseUrl" | "cancelToken" | "signal">;
+    securityWorker?: (securityData: SecurityDataType | null) => Promise<RequestParams | void> | RequestParams | void;
+    customFetch?: typeof fetch;
 }
+export interface HttpResponse<D extends unknown, E extends unknown = unknown> extends Response {
+    data: D;
+    error: E;
+}
+type CancelToken = Symbol | string | number;
 export declare enum ContentType {
     Json = "application/json",
     FormData = "multipart/form-data",
@@ -2189,17 +2199,24 @@ export declare enum ContentType {
     Text = "text/plain"
 }
 export declare class HttpClient<SecurityDataType = unknown> {
-    instance: AxiosInstance;
+    baseUrl: string;
     private securityData;
     private securityWorker?;
-    private secure?;
-    private format?;
-    constructor({ securityWorker, secure, format, ...axiosConfig }?: ApiConfig<SecurityDataType>);
+    private abortControllers;
+    private customFetch;
+    private baseApiParams;
+    constructor(apiConfig?: ApiConfig<SecurityDataType>);
     setSecurityData: (data: SecurityDataType | null) => void;
-    protected mergeRequestParams(params1: AxiosRequestConfig, params2?: AxiosRequestConfig): AxiosRequestConfig;
-    protected stringifyFormItem(formItem: unknown): string;
-    protected createFormData(input: Record<string, unknown>): FormData;
-    request: <T = any, _E = any>({ secure, path, type, query, format, body, ...params }: FullRequestParams) => Promise<AxiosResponse<T>>;
+    protected encodeQueryParam(key: string, value: any): string;
+    protected addQueryParam(query: QueryParamsType, key: string): string;
+    protected addArrayQueryParam(query: QueryParamsType, key: string): any;
+    protected toQueryString(rawQuery?: QueryParamsType): string;
+    protected addQueryParams(rawQuery?: QueryParamsType): string;
+    private contentFormatters;
+    protected mergeRequestParams(params1: RequestParams, params2?: RequestParams): RequestParams;
+    protected createAbortSignal: (cancelToken: CancelToken) => AbortSignal | undefined;
+    abortRequest: (cancelToken: CancelToken) => void;
+    request: <T = any, E = any>({ body, secure, path, type, query, format, baseUrl, cancelToken, ...params }: FullRequestParams) => Promise<HttpResponse<T, E>>;
 }
 /**
  * @title Market Data
@@ -2237,7 +2254,7 @@ export declare class MarketData<SecurityDataType extends unknown> extends HttpCl
              * @example false
              */
             indicative?: true | false;
-        }, params?: RequestParams) => Promise<AxiosResponse<QuoteResponse, any>>;
+        }, params?: RequestParams) => Promise<HttpResponse<QuoteResponse, ErrorResponse>>;
     };
     symbolId: {
         /**
@@ -2256,7 +2273,7 @@ export declare class MarketData<SecurityDataType extends unknown> extends HttpCl
              * @example "quote,reference"
              */
             fields?: string;
-        }, params?: RequestParams) => Promise<AxiosResponse<QuoteResponse, any>>;
+        }, params?: RequestParams) => Promise<HttpResponse<QuoteResponse, ErrorResponse>>;
     };
     chains: {
         /**
@@ -2332,7 +2349,7 @@ export declare class MarketData<SecurityDataType extends unknown> extends HttpCl
             optionType?: string;
             /** Applicable only if its retail token, entitlement of client PP-PayingPro, NP-NonPro and PN-NonPayingPro */
             entitlement?: "PN" | "NP" | "PP" | null;
-        }, params?: RequestParams) => Promise<AxiosResponse<OptionChain, any>>;
+        }, params?: RequestParams) => Promise<HttpResponse<OptionChain, ErrorResponse>>;
     };
     expirationchain: {
         /**
@@ -2350,7 +2367,7 @@ export declare class MarketData<SecurityDataType extends unknown> extends HttpCl
              * @example "AAPL"
              */
             symbol: string;
-        }, params?: RequestParams) => Promise<AxiosResponse<ExpirationChain, any>>;
+        }, params?: RequestParams) => Promise<HttpResponse<ExpirationChain, ErrorResponse>>;
     };
     pricehistory: {
         /**
@@ -2396,7 +2413,7 @@ export declare class MarketData<SecurityDataType extends unknown> extends HttpCl
             needExtendedHoursData?: boolean;
             /** Need previous close price/date */
             needPreviousClose?: boolean;
-        }, params?: RequestParams) => Promise<AxiosResponse<CandleList, any>>;
+        }, params?: RequestParams) => Promise<HttpResponse<CandleList, ErrorResponse>>;
     };
     movers: {
         /**
@@ -2420,9 +2437,9 @@ export declare class MarketData<SecurityDataType extends unknown> extends HttpCl
              * @default 0
              */
             frequency?: 0 | 1 | 5 | 10 | 30 | 60;
-        }, params?: RequestParams) => Promise<AxiosResponse<{
+        }, params?: RequestParams) => Promise<HttpResponse<{
             screeners?: Screener[];
-        }, any>>;
+        }, ErrorResponse>>;
     };
     markets: {
         /**
@@ -2445,7 +2462,7 @@ export declare class MarketData<SecurityDataType extends unknown> extends HttpCl
              * @format date
              */
             date?: string;
-        }, params?: RequestParams) => Promise<AxiosResponse<Record<string, Record<string, Hours>>, any>>;
+        }, params?: RequestParams) => Promise<HttpResponse<Record<string, Record<string, Hours>>, ErrorResponse>>;
         /**
          * @description Get Market Hours for dates in the future for a single market.
          *
@@ -2461,7 +2478,7 @@ export declare class MarketData<SecurityDataType extends unknown> extends HttpCl
              * @format date
              */
             date?: string;
-        }, params?: RequestParams) => Promise<AxiosResponse<Record<string, Record<string, Hours>>, any>>;
+        }, params?: RequestParams) => Promise<HttpResponse<Record<string, Record<string, Hours>>, ErrorResponse>>;
     };
     instruments: {
         /**
@@ -2478,9 +2495,9 @@ export declare class MarketData<SecurityDataType extends unknown> extends HttpCl
             symbol: string;
             /** search by */
             projection: "symbol-search" | "symbol-regex" | "desc-search" | "desc-regex" | "search" | "fundamental";
-        }, params?: RequestParams) => Promise<AxiosResponse<{
+        }, params?: RequestParams) => Promise<HttpResponse<{
             instruments?: InstrumentResponse[];
-        }, any>>;
+        }, ErrorResponse>>;
         /**
          * @description Get basic instrument details by cusip
          *
@@ -2490,7 +2507,8 @@ export declare class MarketData<SecurityDataType extends unknown> extends HttpCl
          * @request GET:/instruments/{cusip_id}
          * @secure
          */
-        getInstrumentsByCusip: (cusipId: string, params?: RequestParams) => Promise<AxiosResponse<InstrumentResponse, any>>;
+        getInstrumentsByCusip: (cusipId: string, params?: RequestParams) => Promise<HttpResponse<InstrumentResponse, ErrorResponse>>;
     };
 }
+export {};
 //# sourceMappingURL=market-data.d.ts.map

@@ -13,9 +13,7 @@ import { EventEmitter } from "events";
 import endpoint from "./endpoints.js";
 import fetchData from "./fetch.js";
 import fetchToken from "./access.js";
-import { RetailTrader, Transaction } from "./sdk/retail-trader.js";
-import { onRequest, onRequestError, onResponse, onResponseError } from "./sdk/interceptors.js";
-import { AxiosResponse } from "axios";
+import { HttpResponse, RetailTrader, Transaction } from "./sdk/retail-trader.js";
 
 // Create WeakMap for private credential storage
 const _credentials: WeakMap<SchwabAPIclient, Credentials> = new WeakMap();
@@ -152,8 +150,6 @@ class TradingApiClient extends SchwabAPIclient {
     super();
 
     this.retailTrader = new RetailTrader();
-    this.retailTrader.instance.interceptors.request.use(onRequest, onRequestError);
-    this.retailTrader.instance.interceptors.response.use(onResponse, onResponseError);
   }
 
   async ordersByAccount(
@@ -264,7 +260,7 @@ class TradingApiClient extends SchwabAPIclient {
     });
   }
 
-  async orderDelete(accountHash: string, orderId: number): Promise<AxiosResponse<void>> {
+  async orderDelete(accountHash: string, orderId: number): Promise<HttpResponse<void>> {
     await this.checkAccessToken(_credentials.get(this)!);
 
     if (!accountHash || accountHash.trim().length === 0) {
